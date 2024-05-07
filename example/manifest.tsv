@@ -1,4 +1,4 @@
 path	parent	annot1	annot2	annot3
-./example/1.txt	syn58962323	NA	NA	NA
-./example/2.txt	syn58962413	NA	NA	NA
-./example/1-dir/*	syn58961812	NA	NA	NA
+./example/1-dir/*	syn58962323	NA	NA	NA
+./example/3.txt	syn58961812	NA	NA	NA
+./example/4.txt	syn58961812	NA	NA	NA
