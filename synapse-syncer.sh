@@ -23,6 +23,11 @@ main() {
 
 	while IFS=$'\t' read -r input_filepath synapse_id_dest other_args; do
 
+		# Ignore if input_filepath begins with a #, indicating it is a comment.
+		if [[ $input_filepath == \#* ]]; then
+			continue
+		fi
+
 		find_stdout="output.txt"
 		find_stderr="error.txt"
 		set +e
