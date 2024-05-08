@@ -1,5 +1,5 @@
-path	parent	annot1	annot2	annot3
-./example/1-dir/*	syn58962323	NA	NA	NA
-./example/3.txt	syn58961812	NA	NA	NA
-./example/4.txt	syn58961812	NA	NA	NA
-# ./example/5.txt	syn58961812	NA	NA	NA
+path	parent
+/users/airanman/synapse-syncer/example/to_sync_1/	syn58961812
+/users/airanman/synapse-syncer/example/to_sync_2/3.txt	syn58961812
+/users/airanman/synapse-syncer/example/to_sync_2/4.txt	syn58961812
+# /users/airanman/synapse-syncer/example/synapse_project/fake	syn58961812

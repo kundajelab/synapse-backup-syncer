@@ -1,5 +1,10 @@
 #!/bin/bash
 # Requires synapseclient via pypi
+# TODO: have the user instead do:
+# filename synapse_id
+# folder synapse_id (the folder will be recursed entirely)
+# file synapse_id
+# Where you should separate the folder rows from the file rows, and for each folder you run synapse manifest <folder_path> --parent-id <synapse_id>, where the folder begins from that id.
 
 set -eou pipefail
 
@@ -8,9 +13,11 @@ MANIFEST_BASENAME=".synapse-manifest.tsv"
 is_local_only=false
 local_log_file="/users/${USER}/$(basename $0).${USER}.log"
 
+
 get_log_prefix() {
 	echo "[$(date)]:"
 }
+
 
 log_to_user() {
 	user=$1
@@ -21,6 +28,7 @@ log_to_user() {
 	fi
 	echo $message | tee -a $log_file
 }
+
 
 sync_manifest() {
 	manifest_tsv=$1
@@ -41,39 +49,41 @@ sync_manifest() {
 	does_manifest_have_invalid_paths=false
 	invalid_filepaths=()
 
-	while IFS=$'\t' read -r input_filepath synapse_id_dest other_args; do
+	while IFS=$'\t' read -r input_filepath synapse_id_dest; do
 
 		# Ignore if input_filepath begins with a #, indicating it is a comment.
 		if [[ $input_filepath == \#* ]]; then
 			continue
 		fi
 
-		find_stdout=$(mktemp)
-		find_stderr=$(mktemp)
-		set +e
-		find $input_filepath > $find_stdout 2> $find_stderr
-		set -e
-		find_exit_code=$?
-
-		# Error handling.
-		if [ $find_exit_code -ne 0 ]; then
-			does_manifest_have_invalid_paths=true
-			if ! grep -q "No such file or directory" $find_stderr; then
-				# Capture find's error message.
-				echo "Error: The following \`find\` operation failed for an unknown reason: ${input_filepath}. Please correct it and run this again."
-			fi
-			invalid_filepaths+=($input_filepath)
-			continue
-		fi
-
-		expanded_filepaths=$(cat $find_stdout)
-		# Iterate through each of the expanded_filepaths
-		for expanded_filepath in $expanded_filepaths
-		do
+		if [ -f $input_filepath ]; then
+			echo -e "${input_filepath}\t${synapse_id_dest}" >> $transformed_tsv
+		elif [ -d $input_filepath ]; then
 			# Append the transformed row to the transformed_tsv
-			echo -e "${expanded_filepath}\t${synapse_id_dest}\t${other_args}" >> $transformed_tsv
-		done
+			# Expand using `manifest`
+			set +e
+			generated_folder_manifest=$(mktemp)
+			manifest_stdout=$(mktemp)
+			manifest_stderr=$(mktemp)
+			python3 /usr/local/bin/synapse manifest $input_filepath --parent-id $synapse_id_dest --manifest-file $generated_folder_manifest > $manifest_stdout 2> $manifest_stderr
+			manifest_exit_code=$?
+			set -e
 
+			# Handle the synapse sync exit status
+			if [ $manifest_exit_code -ne 0 ]; then
+				log_to_user "$user" "$(get_log_prefix) Failed to sync manifest file: $manifest_tsv due to the following error: $(cat $manifest_stderr). Please correct it in order to sync the manifest file."
+				set +e
+				return 1
+				set -e
+			fi
+
+			echo "$(get_log_prefix) Intermediate manifest file for $user's folder $input_filepath written to $generated_folder_manifest:/n$(cat $generated_folder_manifest)"
+
+			tail -n +2 $generated_folder_manifest >> $transformed_tsv
+		else
+			does_manifest_have_invalid_paths=true
+			invalid_filepaths+=($input_filepath)
+		fi
 	done < <(tail -n +2 "$manifest_tsv")
 
 	# Print out the invalid filepaths and exit if there are any.
@@ -89,7 +99,9 @@ sync_manifest() {
 	fi
 
 	echo "$(get_log_prefix) Transformed manifest file for $user written to $transformed_tsv:"
-	cat $transformed_tsv
+
+	# Remove carriage returns.
+	sed -i 's/\r//g' $transformed_tsv
 
 	set +e
 	sync_stdout=$(mktemp)
@@ -106,11 +118,13 @@ sync_manifest() {
 		set -e
 	fi
 
+	echo "$(get_log_prefix) Sync stdout:\n$(cat $sync_stdout)"
+
 	echo "Transformed manifest file successfully synced: $transformed_tsv"
 }
 
-main() {
 
+main() {
 	while [[ "$#" -gt 0 ]]; do
 		case "$1" in
 			--local)
@@ -149,6 +163,7 @@ main() {
 		fi
 	done
 }
+
 
 # Take in a TSV as input
 main "$@"
